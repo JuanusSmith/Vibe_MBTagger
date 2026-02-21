@@ -1,0 +1,9 @@
+// MBTagger.rc
+#include "resource.h"
+#include <windows.h>
+
+// Application icon (place MBTagger.ico in the resources/ folder)
+// IDI_APP ICON "..\\resources\\MBTagger.ico"
+
+// NOTE: Manifest is embedded by the linker via the vcxproj EmbedManifest setting.
+// Do NOT include it here as well or you will get CVT1100 duplicate resource error.

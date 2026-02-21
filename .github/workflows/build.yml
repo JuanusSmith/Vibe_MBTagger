@@ -1,0 +1,100 @@
+name: Build MBTagger
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build (Release x64)
+    runs-on: windows-latest
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Show repo structure so we can confirm file layout ─────────────
+      - name: Show file layout
+        run: |
+          Write-Host "=== Repo root ==="
+          Get-ChildItem -Force
+          Write-Host ""
+          Write-Host "=== src\ ==="
+          Get-ChildItem src -Force
+          Write-Host ""
+          Write-Host "=== .github\workflows\ ==="
+          Get-ChildItem .github\workflows -Force
+
+      # ── 3. Set up MSBuild ────────────────────────────────────────────────
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      # ── 4. Build ─────────────────────────────────────────────────────────
+      - name: Build Release x64
+        run: |
+          msbuild MBTagger.sln `
+            /p:Configuration=Release `
+            /p:Platform=x64 `
+            /m `
+            /verbosity:normal `
+            /nologo
+
+      # ── 5. Verify output ─────────────────────────────────────────────────
+      - name: Verify output
+        run: |
+          Write-Host "=== build\Release\ contents ==="
+          Get-ChildItem build\Release -ErrorAction SilentlyContinue
+          if (!(Test-Path "build\Release\MBTagger.exe")) {
+            Write-Error "MBTagger.exe not found!"
+            exit 1
+          }
+          $size = (Get-Item "build\Release\MBTagger.exe").Length
+          Write-Host "SUCCESS: MBTagger.exe is $([math]::Round($size/1KB, 1)) KB"
+
+      # ── 6. Upload artifact ───────────────────────────────────────────────
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MBTagger-x64
+          path: |
+            build\Release\MBTagger.exe
+            README.md
+          retention-days: 90
+
+  # ── Create a GitHub Release when you push a version tag (e.g. v1.0.0) ──
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: MBTagger-x64
+          path: release-files
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-files/MBTagger.exe
+          body: |
+            ## MusicBrainz Tagger ${{ github.ref_name }}
+
+            ### Setup
+            1. Download `MBTagger.exe`
+            2. Download `fpcalc.exe` from https://acoustid.org/chromaprint and place it in the same folder
+            3. Get a free AcoustID API key from https://acoustid.org/login
+            4. Run `MBTagger.exe` and paste your key in the bar at the top
+
+            ### Requirements
+            - Windows 10 or later (x64)
+            - `fpcalc.exe` from Chromaprint (place next to MBTagger.exe)
